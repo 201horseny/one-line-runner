@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0f1020" />
 <title>One-Line Runner</title>
 <meta property="og:title" content="One-Line Runner" />
-<meta property="og:description" content="A one-button daily arcade. Same map for everyone — what's your score today?" />
+<meta property="og:description" content="Every 100m you level up and get faster. Same daily course for everyone — how far can you go?" />
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -26,15 +26,11 @@
   .title { font-size: clamp(30px, 8.5vw, 62px); font-weight: 800; letter-spacing: -1px; }
   .title .accent { color: #4fd1c5; }
   .sub { margin-top: 10px; font-size: clamp(14px, 4vw, 18px); opacity: .7; }
-  .big-score { font-size: clamp(56px, 16vw, 120px); font-weight: 800; line-height: 1; }
-  .best { margin-top: 8px; font-size: clamp(14px, 4vw, 20px); color: #4fd1c5; font-weight: 600; }
+  .big-score { font-size: clamp(52px, 15vw, 112px); font-weight: 800; line-height: 1; }
+  .lvltag { margin-top: 6px; font-size: clamp(18px, 5vw, 26px); color: #4fd1c5; font-weight: 800; }
+  .best { margin-top: 8px; font-size: clamp(14px, 4vw, 20px); opacity: .8; font-weight: 600; }
   .daytag { margin-top: 4px; font-size: clamp(13px, 3.6vw, 16px); opacity: .6; letter-spacing: 1px; }
-  .emojibar { margin-top: 14px; font-size: clamp(20px, 6vw, 30px); letter-spacing: 2px; }
-  .hint {
-    margin-top: 26px; font-size: clamp(14px, 4vw, 18px); opacity: .85;
-    animation: pulse 1.4s ease-in-out infinite;
-  }
-  @keyframes pulse { 0%,100% { opacity: .35; } 50% { opacity: .95; } }
+  .emojibar { margin-top: 14px; font-size: clamp(18px, 5.2vw, 26px); letter-spacing: 2px; }
   .btnrow { display: flex; gap: 12px; margin-top: 26px; flex-wrap: wrap; justify-content: center; }
   .btn {
     pointer-events: auto; padding: 14px 24px; border-radius: 999px;
@@ -54,32 +50,40 @@
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   #hud {
-    position: fixed; top: 0; left: 0; right: 0; display: flex; justify-content: space-between;
-    padding: 18px 22px; color: #fff; font-weight: 700; font-size: clamp(18px, 5vw, 26px);
-    pointer-events: none;
+    position: fixed; top: 0; left: 0; right: 0; padding: 16px 20px 10px;
+    color: #fff; pointer-events: none;
   }
-  #hud .lbl { opacity: .5; font-size: 12px; font-weight: 600; letter-spacing: 1px; display:block; }
-  #hud .r { text-align: right; color: #4fd1c5; }
-  #hud .mid { text-align: center; opacity: .6; font-size: 13px; align-self: center; letter-spacing: 1px; }
+  #hudTop { display: flex; justify-content: space-between; align-items: flex-start; font-weight: 700; }
+  #hud .lbl { opacity: .5; font-size: 11px; font-weight: 600; letter-spacing: 1px; display:block; }
+  #hud .val { font-size: clamp(20px, 5.5vw, 28px); }
+  #hud .r { text-align: right; }
+  #hud .lvl { color: #4fd1c5; }
+  #hud .mid { text-align: center; opacity: .55; font-size: 12px; letter-spacing: 1px; padding-top: 6px; }
+  #barWrap { margin-top: 10px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
+  #barFill { height: 100%; width: 0%; background: #4fd1c5; border-radius: 3px; transition: width .08s linear; }
 </style>
 </head>
 <body>
 <div id="wrap"><canvas id="game"></canvas></div>
 
 <div id="hud" class="hidden">
-  <div><span class="lbl">SCORE</span><span id="hudScore">0</span></div>
+  <div id="hudTop">
+    <div><span class="lbl">LEVEL</span><span class="val lvl" id="hudLevel">1</span></div>
+    <div style="text-align:center"><span class="lbl">DISTANCE</span><span class="val" id="hudDist">0m</span></div>
+    <div class="r"><span class="lbl">BEST</span><span class="val" id="hudBest">0m</span></div>
+  </div>
+  <div id="barWrap"><div id="barFill"></div></div>
   <div class="mid" id="hudMode">DAILY</div>
-  <div class="r"><span class="lbl">BEST</span><span id="hudBest">0</span></div>
 </div>
 
 <!-- Start screen -->
 <div id="startScreen" class="overlay">
   <div class="title">One-Line <span class="accent">Runner</span></div>
-  <div class="sub" id="startSub">Same map for everyone, every day.</div>
+  <div class="sub" id="startSub">Every 100m you level up &amp; speed up. ⚡</div>
   <div class="daytag" id="startDay">DAILY #1</div>
   <div class="btnrow">
     <button class="btn primary" id="btnDaily">🌍 Daily Challenge</button>
-    <button class="btn ghost" id="btnEndless">♾️ Endless</button>
+    <button class="btn ghost" id="btnEndless">♾️ Free Run</button>
   </div>
   <div class="sub" style="margin-top:22px; opacity:.45; font-size:13px">Tap / Click / Space to jump</div>
 </div>
@@ -87,8 +91,9 @@
 <!-- Game over screen -->
 <div id="overScreen" class="overlay hidden">
   <div class="sub" style="opacity:.6" id="overLabel">GAME OVER</div>
-  <div class="big-score" id="finalScore">0</div>
-  <div class="best" id="bestLine">BEST 0</div>
+  <div class="big-score" id="finalDist">0m</div>
+  <div class="lvltag" id="finalLevel">LEVEL 1</div>
+  <div class="best" id="bestLine">BEST 0m</div>
   <div class="emojibar" id="emojiBar"></div>
   <div class="btnrow">
     <button class="btn primary" id="shareBtn">📤 Share</button>
@@ -103,27 +108,24 @@
 (() => {
   const GAME_URL = 'https://201horseny.github.io/one-line-runner/';
 
-  const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d');
-  const hud = document.getElementById('hud');
-  const hudScore = document.getElementById('hudScore');
-  const hudBest = document.getElementById('hudBest');
-  const hudMode = document.getElementById('hudMode');
-  const startScreen = document.getElementById('startScreen');
-  const startDay = document.getElementById('startDay');
-  const overScreen = document.getElementById('overScreen');
-  const overLabel = document.getElementById('overLabel');
-  const finalScore = document.getElementById('finalScore');
-  const bestLine = document.getElementById('bestLine');
-  const emojiBar = document.getElementById('emojiBar');
-  const shareBtn = document.getElementById('shareBtn');
-  const retryBtn = document.getElementById('retryBtn');
-  const menuBtn = document.getElementById('menuBtn');
-  const btnDaily = document.getElementById('btnDaily');
-  const btnEndless = document.getElementById('btnEndless');
-  const toast = document.getElementById('toast');
+  const $ = id => document.getElementById(id);
+  const canvas = $('game'), ctx = canvas.getContext('2d');
+  const hud = $('hud'), hudLevel = $('hudLevel'), hudDist = $('hudDist'), hudBest = $('hudBest');
+  const hudMode = $('hudMode'), barFill = $('barFill');
+  const startScreen = $('startScreen'), startDay = $('startDay');
+  const overScreen = $('overScreen'), overLabel = $('overLabel');
+  const finalDist = $('finalDist'), finalLevel = $('finalLevel'), bestLine = $('bestLine'), emojiBar = $('emojiBar');
+  const shareBtn = $('shareBtn'), retryBtn = $('retryBtn'), menuBtn = $('menuBtn');
+  const btnDaily = $('btnDaily'), btnEndless = $('btnEndless'), toast = $('toast');
 
-  // ---- Seeded RNG (mulberry32) for the daily map ----
+  // ---- Tuning ----
+  const PX_PER_M = 8;        // 8px on screen = 1 meter
+  const LEVEL_M = 100;       // 100m per level
+  const BASE_SPEED = 200;    // level 1 speed (px/s)
+  const SPEED_STEP = 42;     // +px/s per level
+  const GRAVITY = 2400, JUMP_V = -780;
+
+  // ---- Seeded RNG (mulberry32) for the daily course ----
   function mulberry32(a) {
     return function () {
       a |= 0; a = (a + 0x6D2B79F5) | 0;
@@ -132,7 +134,7 @@
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }
-  const EPOCH = Date.UTC(2026, 0, 1); // Jan 1 2026 UTC = Day #1
+  const EPOCH = Date.UTC(2026, 0, 1);
   function dayNumber() {
     const n = new Date();
     const today = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate());
@@ -144,13 +146,10 @@
   }
   const DAY_NUM = dayNumber();
   startDay.textContent = 'DAILY #' + DAY_NUM;
-
-  // rng() is swapped per mode. Daily => seeded & reproducible for everyone.
-  let seededRng = mulberry32(daySeed());
   let rng = Math.random;
 
   // ---- Responsive canvas ----
-  let W = 0, H = 0, DPR = 1;
+  let W = 0, H = 0, DPR = 1, groundY = 0;
   function resize() {
     DPR = Math.min(window.devicePixelRatio || 1, 2);
     W = window.innerWidth; H = window.innerHeight;
@@ -161,43 +160,34 @@
   }
   window.addEventListener('resize', resize);
 
-  // ---- Game state ----
+  // ---- State ----
   const STATE = { MENU: 0, PLAY: 1, OVER: 2 };
-  let state = STATE.MENU;
-  let mode = 'daily';
-  let groundY = 0;
+  let state = STATE.MENU, mode = 'daily';
 
-  function bestKey() { return mode === 'daily' ? 'olr_daily_' + DAY_NUM : 'olr_endless_best'; }
+  function bestKey() { return mode === 'daily' ? 'olr_daily_' + DAY_NUM : 'olr_free_best'; }
   function getBest() { return parseInt(localStorage.getItem(bestKey()) || '0', 10); }
 
   const player = { x: 0, y: 0, r: 16, vy: 0, onGround: true, rot: 0 };
-  const GRAVITY = 2400, JUMP_V = -780;
   let coyote = 0;
-
-  let speed = 340, baseSpeed = 340;
-  let dist = 0, score = 0;
+  let speed = BASE_SPEED, dist = 0, meters = 0, level = 1;
   let obstacles = [], particles = [], stars = [];
-  let spawnGapPx = 320, sinceSpawn = 0, shake = 0;
+  let sinceSpawn = 0, spawnGapPx = 320, shake = 0;
+  let levelFlash = 0;       // seconds remaining for the LEVEL UP banner
 
   function reset() {
-    // seeded map for daily; fresh random for endless
-    if (mode === 'daily') { seededRng = mulberry32(daySeed()); rng = seededRng; }
-    else { rng = Math.random; }
-
-    speed = baseSpeed = 340;
-    dist = 0; score = 0;
+    rng = (mode === 'daily') ? mulberry32(daySeed()) : Math.random;
+    speed = BASE_SPEED; dist = 0; meters = 0; level = 1;
     obstacles = []; particles = [];
-    spawnGapPx = 320; sinceSpawn = 0;
+    sinceSpawn = 0; spawnGapPx = 340; shake = 0; levelFlash = 0;
     player.x = W * 0.24; player.y = groundY - player.r;
     player.vy = 0; player.onGround = true; player.rot = 0;
-    shake = 0;
     stars = [];
     for (let i = 0; i < 60; i++) {
       stars.push({ x: Math.random() * W, y: Math.random() * groundY, z: 0.2 + Math.random() * 0.8, s: Math.random() * 1.6 + 0.4 });
     }
-    hudMode.textContent = mode === 'daily' ? ('DAILY #' + DAY_NUM) : 'ENDLESS';
-    hudBest.textContent = getBest();
-    hudScore.textContent = '0';
+    hudMode.textContent = mode === 'daily' ? ('DAILY #' + DAY_NUM) : 'FREE RUN';
+    hudBest.textContent = getBest() + 'm';
+    hudLevel.textContent = '1'; hudDist.textContent = '0m'; barFill.style.width = '0%';
   }
 
   function jump() {
@@ -207,13 +197,28 @@
     }
   }
 
+  // Obstacle kinds unlock with level. Gap is time-based so it stays fair as speed rises.
   function spawnObstacle() {
-    const diff = Math.min(dist / 6000, 1);
-    const h = 26 + rng() * (34 + diff * 46);
-    const w = 20 + rng() * 26;
-    obstacles.push({ x: W + 40, w, h, scored: false });
-    const minGap = 300 - diff * 90;
-    spawnGapPx = minGap + rng() * (240 - diff * 120);
+    const roll = rng();
+    let kind = 'short';
+    if (level >= 10 && roll > 0.60) kind = 'double';
+    else if (level >= 5 && roll > 0.72) kind = 'tall';
+
+    const diff = Math.min((level - 1) / 12, 1);
+    if (kind === 'double') {
+      const h = 30 + rng() * 26, w = 20 + rng() * 12;
+      obstacles.push({ x: W + 40, w, h, scored: false });
+      obstacles.push({ x: W + 40 + w + 26 + rng() * 20, w, h, scored: true });
+    } else if (kind === 'tall') {
+      const h = 74 + rng() * (26 + diff * 30), w = 20 + rng() * 18;
+      obstacles.push({ x: W + 40, w, h, scored: false });
+    } else {
+      const h = 26 + rng() * (30 + diff * 34), w = 20 + rng() * 24;
+      obstacles.push({ x: W + 40, w, h, scored: false });
+    }
+    // time gap between spawns shrinks with level but is clamped so a jump can always clear it
+    const gapTime = Math.max(0.52, 1.15 - level * 0.055) + rng() * 0.35;
+    spawnGapPx = speed * gapTime;
   }
 
   function spawnParticles(x, y, n, color) {
@@ -225,86 +230,61 @@
     }
   }
 
-  // ---- Emoji result bar (Wordle-style flair) ----
-  function emojiFor(s) {
-    const cells = 10;
-    const filled = Math.max(0, Math.min(cells, Math.floor(s / 15)));
+  function emojiFor(lv) {
+    const cells = 10, filled = Math.max(0, Math.min(cells, lv));
     let out = '';
     for (let i = 0; i < cells; i++) out += i < filled ? '🟩' : '⬛';
+    if (lv > 10) out += ' +' + (lv - 10); // beyond level 10 = the unlimited zone
     return out;
   }
 
   function gameOver() {
-    state = STATE.OVER;
-    shake = 16;
+    state = STATE.OVER; shake = 16;
     spawnParticles(player.x, player.y, 26, '#ff5a76');
-    const s = Math.floor(score);
-    const prevBest = getBest();
-    const newBest = s > prevBest;
-    if (newBest) localStorage.setItem(bestKey(), String(s));
-    const shownBest = Math.max(s, prevBest);
+    const m = Math.floor(meters), lv = level;
+    const prevBest = getBest(), newBest = m > prevBest;
+    if (newBest) localStorage.setItem(bestKey(), String(m));
+    const shownBest = Math.max(m, prevBest);
 
-    overLabel.textContent = mode === 'daily' ? ('DAILY #' + DAY_NUM) : 'GAME OVER';
-    finalScore.textContent = s;
-    bestLine.textContent = (newBest ? '🎉 NEW BEST ' : 'BEST ') + shownBest;
-    emojiBar.textContent = emojiFor(s);
-    hudBest.textContent = shownBest;
+    overLabel.textContent = mode === 'daily' ? ('DAILY #' + DAY_NUM) : 'FREE RUN';
+    finalDist.textContent = m + 'm';
+    finalLevel.textContent = 'LEVEL ' + lv + (lv > 10 ? ' ⚡ UNLIMITED' : '');
+    bestLine.textContent = (newBest ? '🎉 NEW BEST ' : 'BEST ') + shownBest + 'm';
+    emojiBar.textContent = emojiFor(lv);
+    hudBest.textContent = shownBest + 'm';
 
     setTimeout(() => {
-      if (state === STATE.OVER) {
-        overScreen.classList.remove('hidden');
-        hud.classList.add('hidden');
-      }
+      if (state === STATE.OVER) { overScreen.classList.remove('hidden'); hud.classList.add('hidden'); }
     }, 450);
   }
 
-  // ---- Share card (generated PNG) ----
+  // ---- Share ----
   function buildShareText() {
-    const s = Math.floor(score);
-    const head = mode === 'daily'
-      ? `One-Line Runner · Daily #${DAY_NUM}`
-      : `One-Line Runner · Endless`;
-    return `${head}\nScore: ${s} 🏃‍♂️\n${emojiFor(s)}\nCan you beat me? ${GAME_URL}`;
+    const m = Math.floor(meters), lv = level;
+    const head = mode === 'daily' ? `One-Line Runner · Daily #${DAY_NUM}` : `One-Line Runner · Free Run`;
+    return `${head}\nLevel ${lv} · ${m}m 🏃‍♂️\n${emojiFor(lv)}\nCan you beat me? ${GAME_URL}`;
   }
 
   function makeShareCanvas() {
-    const c = document.createElement('canvas');
-    const w = 1080, h = 1080;
-    c.width = w; c.height = h;
-    const g = c.getContext('2d');
-    // bg
+    const c = document.createElement('canvas'); c.width = 1080; c.height = 1080;
+    const g = c.getContext('2d'), w = 1080, h = 1080, cx = w / 2;
     const grad = g.createLinearGradient(0, 0, 0, h);
     grad.addColorStop(0, '#181b3a'); grad.addColorStop(1, '#0a0a16');
     g.fillStyle = grad; g.fillRect(0, 0, w, h);
-    // neon ground line
-    g.strokeStyle = '#4fd1c5'; g.lineWidth = 8;
-    g.shadowColor = '#4fd1c5'; g.shadowBlur = 40;
-    g.beginPath(); g.moveTo(90, 300); g.lineTo(w - 90, 300); g.stroke();
-    g.shadowBlur = 0;
-    const cx = w / 2;
+    g.strokeStyle = '#4fd1c5'; g.lineWidth = 8; g.shadowColor = '#4fd1c5'; g.shadowBlur = 40;
+    g.beginPath(); g.moveTo(90, 300); g.lineTo(w - 90, 300); g.stroke(); g.shadowBlur = 0;
     g.textAlign = 'center';
-    // title
-    g.fillStyle = '#ffffff'; g.font = '800 76px -apple-system, Segoe UI, Roboto, sans-serif';
+    g.fillStyle = '#fff'; g.font = '800 76px -apple-system, Segoe UI, Roboto, sans-serif';
     g.fillText('ONE-LINE RUNNER', cx, 200);
-    // mode tag
-    g.fillStyle = '#4fd1c5'; g.font = '700 44px -apple-system, Segoe UI, Roboto, sans-serif';
-    g.fillText(mode === 'daily' ? `DAILY #${DAY_NUM}` : 'ENDLESS', cx, 430);
-    // score
-    g.fillStyle = '#ffffff'; g.font = '800 300px -apple-system, Segoe UI, Roboto, sans-serif';
-    g.fillText(String(Math.floor(score)), cx, 720);
+    g.fillStyle = '#4fd1c5'; g.font = '800 50px -apple-system, Segoe UI, Roboto, sans-serif';
+    g.fillText(`LEVEL ${level}` + (level > 10 ? '  ⚡' : ''), cx, 440);
+    g.fillStyle = '#fff'; g.font = '800 260px -apple-system, Segoe UI, Roboto, sans-serif';
+    g.fillText(Math.floor(meters) + 'm', cx, 720);
     g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '600 40px -apple-system, Segoe UI, Roboto, sans-serif';
-    g.fillText('SCORE', cx, 790);
-    // emoji bar (drawn as squares)
-    const s = Math.floor(score);
-    const filled = Math.max(0, Math.min(10, Math.floor(s / 15)));
-    const bw = 70, gap = 12, total = 10 * bw + 9 * gap;
-    let bx = cx - total / 2;
-    for (let i = 0; i < 10; i++) {
-      g.fillStyle = i < filled ? '#4fd1c5' : 'rgba(255,255,255,.12)';
-      g.fillRect(bx, 860, bw, 70);
-      bx += bw + gap;
-    }
-    // footer
+    g.fillText(mode === 'daily' ? `DAILY #${DAY_NUM}` : 'FREE RUN', cx, 790);
+    const filled = Math.max(0, Math.min(10, level));
+    const bw = 70, gap = 12, total = 10 * bw + 9 * gap; let bx = cx - total / 2;
+    for (let i = 0; i < 10; i++) { g.fillStyle = i < filled ? '#4fd1c5' : 'rgba(255,255,255,.12)'; g.fillRect(bx, 860, bw, 70); bx += bw + gap; }
     g.fillStyle = 'rgba(255,255,255,.5)'; g.font = '600 34px -apple-system, Segoe UI, Roboto, sans-serif';
     g.fillText('Can you beat me?  ·  201horseny.github.io/one-line-runner', cx, 1010);
     return c;
@@ -312,26 +292,18 @@
 
   async function share() {
     const text = buildShareText();
-    const c = makeShareCanvas();
-    // Try native share with image (best on mobile)
     try {
-      const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+      const blob = await new Promise(res => makeShareCanvas().toBlob(res, 'image/png'));
       if (blob) {
         const file = new File([blob], 'one-line-runner.png', { type: 'image/png' });
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], text, title: 'One-Line Runner' });
-          return;
+          await navigator.share({ files: [file], text, title: 'One-Line Runner' }); return;
         }
         if (navigator.share) { await navigator.share({ text, url: GAME_URL, title: 'One-Line Runner' }); return; }
-        // Desktop fallback: download the image + copy the text
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'one-line-runner.png';
-        a.click();
-        URL.revokeObjectURL(a.href);
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = 'one-line-runner.png'; a.click(); URL.revokeObjectURL(a.href);
       }
-    } catch (err) { /* user cancelled or unsupported */ }
-    // Always also copy text so there's something to paste
+    } catch (e) {}
     try { await navigator.clipboard.writeText(text); showToast('Copied result!'); }
     catch (e) { showToast('Ready to share'); }
   }
@@ -342,39 +314,29 @@
     setTimeout(() => toast.classList.remove('show'), 1500);
   }
 
-  // ---- Flow control ----
+  // ---- Flow ----
   function startGame(m) {
     mode = m;
-    startScreen.classList.add('hidden');
-    overScreen.classList.add('hidden');
-    hud.classList.remove('hidden');
-    reset();
-    state = STATE.PLAY;
+    startScreen.classList.add('hidden'); overScreen.classList.add('hidden'); hud.classList.remove('hidden');
+    reset(); state = STATE.PLAY;
   }
   function toMenu() {
     state = STATE.MENU;
-    overScreen.classList.add('hidden');
-    hud.classList.add('hidden');
-    startScreen.classList.remove('hidden');
+    overScreen.classList.add('hidden'); hud.classList.add('hidden'); startScreen.classList.remove('hidden');
   }
 
-  // ---- Input ----
-  btnDaily.addEventListener('click', (e) => { e.stopPropagation(); startGame('daily'); });
-  btnEndless.addEventListener('click', (e) => { e.stopPropagation(); startGame('endless'); });
-  retryBtn.addEventListener('click', (e) => { e.stopPropagation(); startGame(mode); });
-  menuBtn.addEventListener('click', (e) => { e.stopPropagation(); toMenu(); });
-  shareBtn.addEventListener('click', (e) => { e.stopPropagation(); share(); });
+  btnDaily.addEventListener('click', e => { e.stopPropagation(); startGame('daily'); });
+  btnEndless.addEventListener('click', e => { e.stopPropagation(); startGame('free'); });
+  retryBtn.addEventListener('click', e => { e.stopPropagation(); startGame(mode); });
+  menuBtn.addEventListener('click', e => { e.stopPropagation(); toMenu(); });
+  shareBtn.addEventListener('click', e => { e.stopPropagation(); share(); });
 
   function press(e) {
-    if (state === STATE.PLAY) {
-      if (e && e.type === 'touchstart') e.preventDefault();
-      jump();
-    }
-    // MENU / OVER handled by their buttons
+    if (state === STATE.PLAY) { if (e && e.type === 'touchstart') e.preventDefault(); jump(); }
   }
   window.addEventListener('mousedown', press);
   window.addEventListener('touchstart', press, { passive: false });
-  window.addEventListener('keydown', (e) => {
+  window.addEventListener('keydown', e => {
     if (e.code === 'Space' || e.code === 'ArrowUp') {
       e.preventDefault();
       if (state === STATE.PLAY) jump();
@@ -395,31 +357,41 @@
 
   function update(dt) {
     dist += speed * dt;
-    score += speed * dt * 0.02;
-    hudScore.textContent = Math.floor(score);
-    baseSpeed = 340 + Math.min(dist / 20, 340);
-    speed = baseSpeed;
+    meters = dist / PX_PER_M;
 
-    player.vy += GRAVITY * dt;
-    player.y += player.vy * dt;
+    // level up every 100m -> step the speed
+    const newLevel = Math.floor(meters / LEVEL_M) + 1;
+    if (newLevel > level) {
+      level = newLevel;
+      levelFlash = 1.1;
+      shake = Math.max(shake, 8);
+      spawnParticles(player.x, groundY, 16, '#ffd166');
+    }
+    // target speed for current level, eased in
+    const target = BASE_SPEED + (level - 1) * SPEED_STEP;
+    speed += (target - speed) * Math.min(1, dt * 4);
+
+    hudLevel.textContent = String(level);
+    hudDist.textContent = Math.floor(meters) + 'm';
+    barFill.style.width = ((meters % LEVEL_M) / LEVEL_M * 100).toFixed(1) + '%';
+
+    // physics
+    player.vy += GRAVITY * dt; player.y += player.vy * dt;
     if (player.onGround) coyote = Math.max(0, coyote - dt);
     player.rot += (player.onGround ? 0 : dt * 8);
-
     const floor = groundY - player.r;
     if (player.y >= floor) {
       player.y = floor;
       if (!player.onGround) { player.onGround = true; coyote = 0.09; player.rot = 0; }
       player.vy = 0;
-    } else { player.onGround = false; }
+    } else player.onGround = false;
 
     sinceSpawn += speed * dt;
     if (sinceSpawn >= spawnGapPx) { sinceSpawn = 0; spawnObstacle(); }
 
     for (const o of obstacles) {
       o.x -= speed * dt;
-      if (!o.scored && o.x + o.w < player.x - player.r) {
-        o.scored = true; score += 5; spawnParticles(player.x, player.y, 4, '#ffd166');
-      }
+      if (!o.scored && o.x + o.w < player.x - player.r) { o.scored = true; spawnParticles(player.x, player.y, 3, '#ffd166'); }
       const px = player.x, py = player.y, pr = player.r * 0.82;
       const nx = Math.max(o.x, Math.min(px, o.x + o.w));
       const ny = Math.max(groundY - o.h, Math.min(py, groundY));
@@ -428,9 +400,7 @@
     }
     obstacles = obstacles.filter(o => o.x + o.w > -20);
 
-    for (const p of particles) {
-      p.vy += 900 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
-    }
+    for (const p of particles) { p.vy += 900 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
     particles = particles.filter(p => p.life > 0);
 
     for (const st of stars) {
@@ -438,6 +408,7 @@
       if (st.x < -2) { st.x = W + 2; st.y = Math.random() * groundY; }
     }
     if (shake > 0) shake = Math.max(0, shake - dt * 60);
+    if (levelFlash > 0) levelFlash = Math.max(0, levelFlash - dt);
   }
 
   function render() {
@@ -450,17 +421,11 @@
     g.addColorStop(0, '#141633'); g.addColorStop(0.7, '#0f1020'); g.addColorStop(1, '#0a0a16');
     ctx.fillStyle = g; ctx.fillRect(-20, -20, W + 40, H + 40);
 
-    for (const st of stars) {
-      ctx.globalAlpha = 0.3 + st.z * 0.5;
-      ctx.fillStyle = '#8892d6';
-      ctx.fillRect(st.x, st.y, st.s, st.s);
-    }
+    for (const st of stars) { ctx.globalAlpha = 0.3 + st.z * 0.5; ctx.fillStyle = '#8892d6'; ctx.fillRect(st.x, st.y, st.s, st.s); }
     ctx.globalAlpha = 1;
 
-    ctx.strokeStyle = '#4fd1c5'; ctx.lineWidth = 3;
-    ctx.shadowColor = '#4fd1c5'; ctx.shadowBlur = 14;
-    ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(W, groundY); ctx.stroke();
-    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#4fd1c5'; ctx.lineWidth = 3; ctx.shadowColor = '#4fd1c5'; ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(W, groundY); ctx.stroke(); ctx.shadowBlur = 0;
 
     for (const o of obstacles) {
       ctx.fillStyle = '#ff5a76'; ctx.shadowColor = '#ff5a76'; ctx.shadowBlur = 12;
@@ -476,11 +441,24 @@
     }
 
     for (const p of particles) {
-      ctx.globalAlpha = Math.max(0, p.life / p.max);
-      ctx.fillStyle = p.color;
+      ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.color;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;
+
+    // LEVEL UP banner
+    if (levelFlash > 0 && state === STATE.PLAY) {
+      const a = Math.min(1, levelFlash * 2);
+      ctx.globalAlpha = a;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffd166'; ctx.shadowColor = '#ffd166'; ctx.shadowBlur = 20;
+      ctx.font = '800 ' + Math.round(Math.min(W, 520) * 0.11) + 'px -apple-system, Segoe UI, Roboto, sans-serif';
+      ctx.fillText('LEVEL ' + level + '  ⚡', W / 2, H * 0.34);
+      ctx.shadowBlur = 0; ctx.fillStyle = 'rgba(255,255,255,.8)';
+      ctx.font = '700 ' + Math.round(Math.min(W, 520) * 0.045) + 'px -apple-system, Segoe UI, Roboto, sans-serif';
+      ctx.fillText('SPEED UP', W / 2, H * 0.34 + Math.min(W, 520) * 0.09);
+      ctx.globalAlpha = 1;
+    }
     ctx.restore();
   }
 
@@ -494,9 +472,7 @@
     ctx.closePath();
   }
 
-  resize();
-  reset();
-  requestAnimationFrame(frame);
+  resize(); reset(); requestAnimationFrame(frame);
 })();
 </script>
 </body>
