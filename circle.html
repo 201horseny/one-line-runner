@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0f1020" />
+<title>Perfect Circle</title>
+<meta property="og:title" content="Perfect Circle" />
+<meta property="og:description" content="Tap when the needle hits the green zone. It gets faster, tighter, and flips direction. How high can your combo go?" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #0f1020; touch-action: manipulation;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    user-select: none; -webkit-user-select: none;
+  }
+  #wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  canvas#game { display: block; background: #0f1020; touch-action: none; }
+  .overlay {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    color: #fff; pointer-events: none; padding: 24px;
+  }
+  .overlay.hidden { display: none; }
+  .title { font-size: clamp(30px, 8.5vw, 62px); font-weight: 800; letter-spacing: -1px; }
+  .title .accent { color: #4fd1c5; }
+  .sub { margin-top: 10px; font-size: clamp(14px, 4vw, 18px); opacity: .7; max-width: 340px; line-height: 1.5; }
+  .big-score { font-size: clamp(52px, 15vw, 112px); font-weight: 800; line-height: 1; }
+  .lvltag { margin-top: 6px; font-size: clamp(18px, 5vw, 26px); color: #4fd1c5; font-weight: 800; }
+  .best { margin-top: 8px; font-size: clamp(14px, 4vw, 20px); opacity: .8; font-weight: 600; }
+  .emojibar { margin-top: 14px; font-size: clamp(18px, 5.2vw, 26px); letter-spacing: 2px; min-height: 30px; }
+  .btnrow { display: flex; gap: 12px; margin-top: 26px; flex-wrap: wrap; justify-content: center; }
+  .btn {
+    pointer-events: auto; padding: 14px 24px; border-radius: 999px;
+    border: 1.5px solid rgba(255,255,255,.22); background: rgba(255,255,255,.06);
+    color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; backdrop-filter: blur(6px);
+    transition: transform .1s, background .15s, border-color .15s;
+  }
+  .btn:active { transform: scale(.94); }
+  .btn.primary { background: #4fd1c5; color: #0f1020; border-color: #4fd1c5; }
+  .btn.primary:active { background: #3bb8ad; }
+  .btn.ghost:active { background: rgba(255,255,255,.14); }
+  .toast {
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #4fd1c5; color: #0f1020; padding: 10px 20px; border-radius: 999px;
+    font-weight: 700; font-size: 14px; opacity: 0; transition: opacity .25s, transform .25s;
+    pointer-events: none; z-index: 20;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0; padding: 20px 20px 10px;
+    color: #fff; pointer-events: none; text-align: center;
+  }
+  #hud.hidden { display: none; }
+  #hud .lbl { opacity: .5; font-size: 11px; font-weight: 600; letter-spacing: 1px; display:block; }
+  #hud .big { font-size: clamp(44px, 13vw, 76px); font-weight: 800; line-height: 1; }
+  #hud .best { font-size: 13px; opacity: .55; margin-top: 6px; font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="game"></canvas></div>
+
+<div id="hud" class="hidden">
+  <span class="lbl">COMBO</span>
+  <div class="big" id="hudScore">0</div>
+  <div class="best" id="hudBest">BEST 0</div>
+</div>
+
+<!-- Start screen -->
+<div id="startScreen" class="overlay">
+  <div class="title">Perfect <span class="accent">Circle</span></div>
+  <div class="sub">Tap when the needle hits the <b style="color:#4fd1c5">green zone</b>.<br>It gets faster, tighter, and flips direction.</div>
+  <div class="best" id="startBest"></div>
+  <div class="btnrow">
+    <button class="btn primary" id="playBtn">Play</button>
+  </div>
+</div>
+
+<!-- Game over screen -->
+<div id="overScreen" class="overlay hidden">
+  <div class="sub" style="opacity:.6;margin:0">COMBO</div>
+  <div class="big-score" id="finalScore">0</div>
+  <div class="lvltag" id="finalNote">Nice!</div>
+  <div class="best" id="overBest"></div>
+  <div class="emojibar" id="emojibar"></div>
+  <div class="btnrow">
+    <button class="btn primary" id="retryBtn">Retry</button>
+    <button class="btn ghost" id="shareBtn">Share</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+  var canvas = document.getElementById("game");
+  var ctx = canvas.getContext("2d");
+
+  // ---- DOM ----
+  var hud = document.getElementById("hud");
+  var hudScore = document.getElementById("hudScore");
+  var hudBest = document.getElementById("hudBest");
+  var startScreen = document.getElementById("startScreen");
+  var startBest = document.getElementById("startBest");
+  var overScreen = document.getElementById("overScreen");
+  var finalScore = document.getElementById("finalScore");
+  var finalNote = document.getElementById("finalNote");
+  var overBest = document.getElementById("overBest");
+  var emojibar = document.getElementById("emojibar");
+  var toast = document.getElementById("toast");
+
+  var ACCENT = "#4fd1c5";
+  var BG = "#0f1020";
+  var DANGER = "#ff5a6e";
+
+  // ---- sizing ----
+  var W = 0, H = 0, DPR = 1, cx = 0, cy = 0, radius = 0;
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2.5);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    cx = W / 2;
+    cy = H / 2 + 10;
+    radius = Math.min(W, H) * 0.30;
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  // ---- persistent best ----
+  var BEST_KEY = "perfectCircleBest";
+  var best = parseInt(localStorage.getItem(BEST_KEY) || "0", 10) || 0;
+
+  // ---- game state ----
+  var STATE_START = 0, STATE_PLAY = 1, STATE_OVER = 2;
+  var state = STATE_START;
+
+  var angle = 0;          // needle angle (radians)
+  var dir = 1;            // 1 or -1
+  var speed = 0;          // radians per second
+  var targetStart = 0;    // start of green zone (radians)
+  var targetArc = 0;      // size of green zone (radians)
+  var score = 0;
+  var lastHitAngle = 0;
+
+  // juice
+  var particles = [];
+  var ringPulse = 0;      // 0..1 shrinking
+  var ringColor = ACCENT;
+  var shake = 0;
+  var flashDir = 0;       // >0 shows a "reverse!" flash timer
+  var missMark = null;    // {angle} where the miss happened
+  var missFade = 0;
+
+  var TWO_PI = Math.PI * 2;
+
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  function placeTarget() {
+    // put the green zone somewhere ahead of the needle so there's reaction time
+    var lead = rand(1.1, 2.4) * dir;      // radians ahead in travel direction
+    targetStart = norm(angle + lead - targetArc / 2);
+  }
+
+  function norm(a) {
+    a = a % TWO_PI;
+    if (a < 0) a += TWO_PI;
+    return a;
+  }
+
+  // shortest angular distance
+  function angDist(a, b) {
+    var d = Math.abs(norm(a) - norm(b));
+    return Math.min(d, TWO_PI - d);
+  }
+
+  function difficulty() {
+    // arc shrinks, speed grows with score
+    targetArc = Math.max(0.30, 0.85 - score * 0.028);       // radians (~49deg down to ~17deg)
+    speed = 2.0 + score * 0.14;                             // rad/s
+    if (speed > 7.5) speed = 7.5;
+  }
+
+  function startGame() {
+    state = STATE_PLAY;
+    score = 0;
+    dir = Math.random() < 0.5 ? 1 : -1;
+    angle = rand(0, TWO_PI);
+    particles = [];
+    ringPulse = 0; shake = 0; flashDir = 0; missMark = null; missFade = 0;
+    difficulty();
+    placeTarget();
+    hudScore.textContent = "0";
+    hudBest.textContent = "BEST " + best;
+    startScreen.classList.add("hidden");
+    overScreen.classList.add("hidden");
+    hud.classList.remove("hidden");
+  }
+
+  function hit() {
+    score++;
+    hudScore.textContent = String(score);
+    lastHitAngle = angle;
+    // pulse ring + particles at needle position
+    ringPulse = 1; ringColor = ACCENT;
+    spawnParticles(needlePos(), ACCENT, 10 + Math.min(score, 20));
+    if (navigator.vibrate) navigator.vibrate(12);
+
+    // every few hits, flip direction for a surprise
+    var flip = (score % 4 === 0);
+    if (flip) {
+      dir *= -1;
+      flashDir = 0.6;
+      if (navigator.vibrate) navigator.vibrate([12, 40, 12]);
+    }
+    difficulty();
+    placeTarget();
+  }
+
+  function miss() {
+    state = STATE_OVER;
+    shake = 1;
+    ringPulse = 1; ringColor = DANGER;
+    missMark = norm(angle); missFade = 1;
+    spawnParticles(needlePos(), DANGER, 18);
+    if (navigator.vibrate) navigator.vibrate([30, 30, 60]);
+
+    var isBest = score > best;
+    if (isBest) { best = score; localStorage.setItem(BEST_KEY, String(best)); }
+
+    setTimeout(showOver, 620, isBest);
+  }
+
+  function showOver(isBest) {
+    finalScore.textContent = String(score);
+    finalNote.textContent = noteFor(score);
+    overBest.textContent = isBest ? "🎉 New best!" : ("BEST " + best);
+    emojibar.textContent = emojiFor(score);
+    hud.classList.add("hidden");
+    overScreen.classList.remove("hidden");
+  }
+
+  function noteFor(s) {
+    if (s === 0) return "So close!";
+    if (s < 5) return "Warming up";
+    if (s < 12) return "Sharp!";
+    if (s < 22) return "On fire 🔥";
+    if (s < 35) return "Insane!";
+    return "Legendary 👑";
+  }
+  function emojiFor(s) {
+    var n = Math.min(10, Math.max(1, Math.round(s / 4)));
+    var e = s >= 22 ? "🔥" : s >= 12 ? "🎯" : "🟢";
+    var out = "";
+    for (var i = 0; i < n; i++) out += e;
+    return out;
+  }
+
+  function needlePos() {
+    return { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius };
+  }
+
+  function spawnParticles(p, color, count) {
+    for (var i = 0; i < count; i++) {
+      var a = rand(0, TWO_PI), sp = rand(40, 220);
+      particles.push({
+        x: p.x, y: p.y,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        life: 1, color: color, r: rand(2, 5)
+      });
+    }
+  }
+
+  // ---- input ----
+  function onTap() {
+    if (state === STATE_PLAY) {
+      // hit if needle center is within the green arc
+      var d = norm(angle - targetStart);      // 0..2pi from arc start
+      if (d <= targetArc) hit();
+      else miss();
+    }
+  }
+  function press(e) {
+    if (e.type === "touchstart") e.preventDefault();
+    if (state === STATE_PLAY) onTap();
+  }
+  canvas.addEventListener("touchstart", press, { passive: false });
+  canvas.addEventListener("mousedown", press);
+  window.addEventListener("keydown", function (e) {
+    if (e.code === "Space") { e.preventDefault(); if (state === STATE_PLAY) onTap(); }
+  });
+
+  // ---- buttons ----
+  document.getElementById("playBtn").addEventListener("click", startGame);
+  document.getElementById("retryBtn").addEventListener("click", startGame);
+  document.getElementById("shareBtn").addEventListener("click", share);
+
+  function share() {
+    var txt = "🎯 Perfect Circle — combo " + score + "!\nTap when the needle hits the green. Beat me:";
+    var url = location.href.split("#")[0];
+    if (navigator.share) {
+      navigator.share({ title: "Perfect Circle", text: txt, url: url }).catch(function () {});
+    } else {
+      var full = txt + " " + url;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(full).then(function () { showToast("Copied to clipboard!"); },
+          function () { showToast("Couldn't copy"); });
+      } else showToast("Sharing not supported");
+    }
+  }
+  var toastT = null;
+  function showToast(m) {
+    toast.textContent = m; toast.classList.add("show");
+    clearTimeout(toastT);
+    toastT = setTimeout(function () { toast.classList.remove("show"); }, 1600);
+  }
+
+  // ---- loop ----
+  var last = 0;
+  function frame(t) {
+    if (!last) last = t;
+    var dt = Math.min(0.05, (t - last) / 1000);
+    last = t;
+
+    if (state === STATE_PLAY) {
+      angle = norm(angle + dir * speed * dt);
+    }
+
+    // decay juice
+    if (ringPulse > 0) ringPulse = Math.max(0, ringPulse - dt * 2.4);
+    if (shake > 0) shake = Math.max(0, shake - dt * 2.2);
+    if (flashDir > 0) flashDir = Math.max(0, flashDir - dt);
+    if (missFade > 0) missFade = Math.max(0, missFade - dt * 0.6);
+    for (var i = particles.length - 1; i >= 0; i--) {
+      var p = particles[i];
+      p.life -= dt * 1.6;
+      if (p.life <= 0) { particles.splice(i, 1); continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.vx *= 0.94; p.vy *= 0.94;
+    }
+
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    ctx.save();
+    if (shake > 0) {
+      var s = shake * 10;
+      ctx.translate(rand(-s, s), rand(-s, s));
+    }
+
+    // track ring
+    ctx.lineWidth = Math.max(10, radius * 0.14);
+    ctx.strokeStyle = "rgba(255,255,255,0.10)";
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, TWO_PI);
+    ctx.stroke();
+
+    // green target zone
+    if (state === STATE_PLAY) {
+      ctx.strokeStyle = ACCENT;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, targetStart, targetStart + targetArc);
+      ctx.stroke();
+      ctx.lineCap = "butt";
+    }
+
+    // miss marker
+    if (missMark !== null && missFade > 0) {
+      ctx.globalAlpha = missFade;
+      ctx.strokeStyle = DANGER;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, missMark - 0.05, missMark + 0.05);
+      ctx.stroke();
+      ctx.lineCap = "butt";
+      ctx.globalAlpha = 1;
+    }
+
+    // pulse ring
+    if (ringPulse > 0) {
+      ctx.globalAlpha = ringPulse * 0.8;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = ringColor;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius + (1 - ringPulse) * 60, 0, TWO_PI);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // needle
+    var np = needlePos();
+    // line from center
+    ctx.strokeStyle = "rgba(255,255,255,0.28)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(np.x, np.y);
+    ctx.stroke();
+    // needle head
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(np.x, np.y, Math.max(7, radius * 0.055), 0, TWO_PI);
+    ctx.fill();
+
+    // center dot + direction hint
+    ctx.fillStyle = flashDir > 0 ? ACCENT : "rgba(255,255,255,0.5)";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 5, 0, TWO_PI);
+    ctx.fill();
+
+    // particles
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, TWO_PI);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // center score while playing
+    if (state === STATE_PLAY) {
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.font = "800 " + Math.round(radius * 0.5) + "px -apple-system, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(score), cx, cy - radius * 0.02);
+    }
+
+    // "REVERSE!" flash
+    if (flashDir > 0 && state === STATE_PLAY) {
+      ctx.globalAlpha = Math.min(1, flashDir / 0.6);
+      ctx.fillStyle = ACCENT;
+      ctx.font = "800 " + Math.round(radius * 0.16) + "px -apple-system, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("REVERSE!", cx, cy + radius + 40);
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.restore();
+  }
+
+  // init labels
+  startBest.textContent = best > 0 ? ("BEST " + best) : "";
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
