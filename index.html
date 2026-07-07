@@ -167,7 +167,7 @@
   function bestKey() { return mode === 'daily' ? 'olr_daily_' + DAY_NUM : 'olr_free_best'; }
   function getBest() { return parseInt(localStorage.getItem(bestKey()) || '0', 10); }
 
-  const player = { x: 0, y: 0, r: 16, vy: 0, onGround: true, rot: 0, jumps: 0 };
+  const player = { x: 0, y: 0, r: 26, vy: 0, onGround: true, rot: 0, jumps: 0 };
   const MAX_JUMPS = 2;
   let coyote = 0;
   let speed = BASE_SPEED, dist = 0, meters = 0, level = 1;
@@ -278,10 +278,8 @@
     g.fillStyle = grad; g.fillRect(0, 0, w, h);
     g.strokeStyle = '#4fd1c5'; g.lineWidth = 8; g.shadowColor = '#4fd1c5'; g.shadowBlur = 40;
     g.beginPath(); g.moveTo(90, 300); g.lineTo(w - 90, 300); g.stroke(); g.shadowBlur = 0;
-    // little horse standing on the line
-    g.textAlign = 'center'; g.textBaseline = 'alphabetic';
-    g.font = '120px "Apple Color Emoji", "Segoe UI Emoji", serif';
-    g.fillText('🐎', 300, 296);
+    // cute horse standing on the line
+    g.save(); g.translate(300, 300 - 26 * 2.4); g.scale(2.4, 2.4); drawHorse(g, 26, 0.6, true); g.restore();
     g.textAlign = 'center';
     g.fillStyle = '#fff'; g.font = '800 76px -apple-system, Segoe UI, Roboto, sans-serif';
     g.fillText('ONE-LINE RUNNER', cx, 200);
@@ -401,7 +399,7 @@
     for (const o of obstacles) {
       o.x -= speed * dt;
       if (!o.scored && o.x + o.w < player.x - player.r) { o.scored = true; spawnParticles(player.x, player.y, 3, '#ffd166'); }
-      const px = player.x, py = player.y, pr = player.r * 0.82;
+      const px = player.x, py = player.y, pr = player.r * 0.58;
       const nx = Math.max(o.x, Math.min(px, o.x + o.w));
       const ny = Math.max(groundY - o.h, Math.min(py, groundY));
       const dx = px - nx, dy = py - ny;
@@ -446,12 +444,9 @@
       ctx.save();
       ctx.translate(player.x, player.y);
       // tilt with vertical velocity: nose up when rising, down when falling
-      const tilt = Math.max(-0.45, Math.min(0.45, player.vy * 0.0005));
+      const tilt = Math.max(-0.4, Math.min(0.4, player.vy * 0.00045));
       ctx.rotate(tilt);
-      ctx.scale(-1, 1); // 🐎 faces left by default → flip to run rightward
-      ctx.font = (player.r * 2.7) + 'px "Apple Color Emoji", "Segoe UI Emoji", serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('🐎', 0, 0);
+      drawHorse(ctx, player.r, dist / 26, player.onGround);
       ctx.restore();
     }
 
@@ -485,6 +480,63 @@
     ctx.arcTo(x, y + h, x, y, r);
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
+  }
+
+  // ---- Cute chibi horse character (drawn on any 2d context) ----
+  function ell(c, x, y, rx, ry, color) {
+    c.save(); c.translate(x, y); c.scale(rx, ry);
+    c.beginPath(); c.arc(0, 0, 1, 0, Math.PI * 2);
+    c.fillStyle = color; c.fill(); c.restore();
+  }
+  function capsule(c, x, y0, y1, w, color) {
+    c.strokeStyle = color; c.lineWidth = w; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x, y0); c.lineTo(x, y1); c.stroke();
+  }
+  // origin = center; feet touch at y=+R; faces right (+x = forward)
+  function drawHorse(c, R, phase, grounded) {
+    const BODY = '#ffd9a8', SHADE = '#f0b57e', MANE = '#8b7bff', MANE2 = '#a99bff',
+          MUZ = '#fff1e2', EYE = '#3a2e4d', CHEEK = 'rgba(255,120,160,.6)';
+    const k = R;
+    const s1 = grounded ? Math.sin(phase) : 0.55;
+    const s2 = grounded ? Math.sin(phase + Math.PI) : -0.35;
+    const legTop = 0.12 * k, legBot = 0.98 * k, legW = 0.26 * k;
+
+    // far legs + tail (behind body)
+    capsule(c, -0.45 * k + s1 * 0.14 * k, legTop, legBot, legW, SHADE);
+    capsule(c,  0.42 * k + s2 * 0.14 * k, legTop, legBot, legW, SHADE);
+    ell(c, -0.95 * k, -0.32 * k, 0.22 * k, 0.4 * k, MANE);
+    ell(c, -1.04 * k, -0.02 * k, 0.16 * k, 0.26 * k, MANE2);
+
+    // body
+    ell(c, -0.05 * k, 0.2 * k, 0.92 * k, 0.62 * k, BODY);
+
+    // near legs (in front of body)
+    capsule(c, -0.32 * k + s2 * 0.14 * k, legTop, legBot, legW, BODY);
+    capsule(c,  0.52 * k + s1 * 0.14 * k, legTop, legBot, legW, BODY);
+
+    // head
+    ell(c, 0.62 * k, -0.42 * k, 0.64 * k, 0.6 * k, BODY);
+    // ear
+    c.fillStyle = BODY;
+    c.beginPath();
+    c.moveTo(0.42 * k, -0.98 * k); c.lineTo(0.6 * k, -0.68 * k); c.lineTo(0.3 * k, -0.72 * k);
+    c.closePath(); c.fill();
+    // mane along back of head/neck
+    ell(c, 0.28 * k, -0.72 * k, 0.2 * k, 0.26 * k, MANE);
+    ell(c, 0.15 * k, -0.42 * k, 0.2 * k, 0.26 * k, MANE2);
+    ell(c, 0.1 * k, -0.12 * k, 0.18 * k, 0.22 * k, MANE);
+    // muzzle
+    ell(c, 1.02 * k, -0.26 * k, 0.34 * k, 0.28 * k, MUZ);
+    ell(c, 1.14 * k, -0.28 * k, 0.035 * k, 0.05 * k, '#c98f6b'); // nostril
+    // mouth
+    c.strokeStyle = '#c98f6b'; c.lineWidth = 0.035 * k; c.lineCap = 'round';
+    c.beginPath(); c.arc(1.0 * k, -0.18 * k, 0.1 * k, 0.12 * Math.PI, 0.62 * Math.PI); c.stroke();
+    // cheek
+    ell(c, 0.66 * k, -0.16 * k, 0.14 * k, 0.11 * k, CHEEK);
+    // eye (big + highlight)
+    ell(c, 0.82 * k, -0.5 * k, 0.13 * k, 0.16 * k, '#fff');
+    ell(c, 0.85 * k, -0.47 * k, 0.08 * k, 0.11 * k, EYE);
+    ell(c, 0.88 * k, -0.52 * k, 0.032 * k, 0.04 * k, '#fff');
   }
 
   resize(); reset(); requestAnimationFrame(frame);
