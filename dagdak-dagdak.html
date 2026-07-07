@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0f1020" />
+<title>다그닥다그닥 · 미니마니모</title>
+<meta property="og:title" content="다그닥다그닥 · 미니마니모" />
+<meta property="og:description" content="달리는 말이 되어 장애물을 뛰어넘어라. 100m마다 빨라진다 — 얼마나 멀리 갈 수 있을까?" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #0f1020; touch-action: manipulation;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    user-select: none; -webkit-user-select: none;
+  }
+  #wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  canvas#game { display: block; background: #0f1020; touch-action: none; }
+  .overlay {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    color: #fff; pointer-events: none; padding: 24px;
+  }
+  .overlay.hidden { display: none; }
+  .title { font-size: clamp(30px, 8.5vw, 62px); font-weight: 800; letter-spacing: -1px; text-shadow: 0 4px 30px rgba(0,0,0,.6); }
+  .title .accent { color: #4fd1c5; text-shadow: 0 0 24px rgba(79,209,197,.7); }
+  .sub { margin-top: 10px; font-size: clamp(14px, 4vw, 18px); opacity: .7; }
+  .big-score { font-size: clamp(52px, 15vw, 112px); font-weight: 800; line-height: 1; }
+  .lvltag { margin-top: 6px; font-size: clamp(18px, 5vw, 26px); color: #4fd1c5; font-weight: 800; }
+  .best { margin-top: 8px; font-size: clamp(14px, 4vw, 20px); opacity: .8; font-weight: 600; }
+  .daytag { margin-top: 4px; font-size: clamp(13px, 3.6vw, 16px); opacity: .6; letter-spacing: 1px; }
+  .emojibar { margin-top: 14px; font-size: clamp(18px, 5.2vw, 26px); letter-spacing: 2px; }
+  .btnrow { display: flex; gap: 12px; margin-top: 26px; flex-wrap: wrap; justify-content: center; }
+  .btn {
+    pointer-events: auto; padding: 14px 24px; border-radius: 999px;
+    border: 1.5px solid rgba(255,255,255,.22); background: rgba(255,255,255,.06);
+    color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; backdrop-filter: blur(6px);
+    transition: transform .1s, background .15s, border-color .15s;
+  }
+  .btn:active { transform: scale(.94); }
+  .btn.primary { background: #4fd1c5; color: #0f1020; border-color: #4fd1c5; }
+  .btn.primary:active { background: #3bb8ad; }
+  .btn.ghost:active { background: rgba(255,255,255,.14); }
+  .toast {
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #4fd1c5; color: #0f1020; padding: 10px 20px; border-radius: 999px;
+    font-weight: 700; font-size: 14px; opacity: 0; transition: opacity .25s, transform .25s;
+    pointer-events: none; z-index: 20;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0; padding: 16px 20px 10px;
+    color: #fff; pointer-events: none;
+  }
+  #hudTop { display: flex; justify-content: space-between; align-items: flex-start; font-weight: 700; }
+  #hud .lbl { opacity: .5; font-size: 11px; font-weight: 600; letter-spacing: 1px; display:block; }
+  #hud .val { font-size: clamp(20px, 5.5vw, 28px); }
+  #hud .r { text-align: right; }
+  #hud .lvl { color: #4fd1c5; }
+  #hud .mid { text-align: center; opacity: .55; font-size: 12px; letter-spacing: 1px; padding-top: 6px; }
+  #barWrap { margin-top: 10px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
+  #barFill { height: 100%; width: 0%; background: #4fd1c5; border-radius: 3px; transition: width .08s linear; }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="game"></canvas></div>
+
+<div id="hud" class="hidden">
+  <div id="hudTop">
+    <div><span class="lbl">레벨</span><span class="val lvl" id="hudLevel">1</span></div>
+    <div style="text-align:center"><span class="lbl">거리</span><span class="val" id="hudDist">0m</span></div>
+    <div class="r"><span class="lbl">최고</span><span class="val" id="hudBest">0m</span></div>
+  </div>
+  <div id="barWrap"><div id="barFill"></div></div>
+  <div class="mid" id="hudMode">오늘의 챌린지</div>
+</div>
+
+<!-- Start screen -->
+<div id="startScreen" class="overlay">
+  <div class="title">다그닥<span class="accent">다그닥</span></div>
+  <div class="sub" id="startSub">100m마다 레벨업 &amp; 속도 상승 ⚡</div>
+  <div class="daytag" id="startDay">오늘의 챌린지 #1</div>
+  <div class="btnrow">
+    <button class="btn primary" id="btnDaily">🌍 오늘의 챌린지</button>
+    <button class="btn ghost" id="btnEndless">♾️ 자유 달리기</button>
+  </div>
+  <div class="sub" style="margin-top:22px; opacity:.45; font-size:13px">화면 탭 / 클릭 / 스페이스로 점프</div>
+  <a href="/" style="pointer-events:auto; margin-top:18px; color:#fff; opacity:.4; font-size:13px; text-decoration:none">‹ 미니마니모</a>
+</div>
+
+<!-- Game over screen -->
+<div id="overScreen" class="overlay hidden">
+  <div class="sub" style="opacity:.6" id="overLabel">게임 오버</div>
+  <div class="big-score" id="finalDist">0m</div>
+  <div class="lvltag" id="finalLevel">레벨 1</div>
+  <div class="best" id="bestLine">최고 0m</div>
+  <div class="emojibar" id="emojiBar"></div>
+  <div class="btnrow">
+    <button class="btn primary" id="shareBtn">📤 공유</button>
+    <button class="btn ghost" id="retryBtn">↻ 다시하기</button>
+    <button class="btn ghost" id="menuBtn">☰ 메뉴</button>
+  </div>
+</div>
+
+<div id="toast" class="toast">복사됨!</div>
+
+<script>
+(() => {
+  const GAME_URL = 'https://minimanimo.pages.dev/dagdak-dagdak';
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('game'), ctx = canvas.getContext('2d');
+  const hud = $('hud'), hudLevel = $('hudLevel'), hudDist = $('hudDist'), hudBest = $('hudBest');
+  const hudMode = $('hudMode'), barFill = $('barFill');
+  const startScreen = $('startScreen'), startDay = $('startDay');
+  const overScreen = $('overScreen'), overLabel = $('overLabel');
+  const finalDist = $('finalDist'), finalLevel = $('finalLevel'), bestLine = $('bestLine'), emojiBar = $('emojiBar');
+  const shareBtn = $('shareBtn'), retryBtn = $('retryBtn'), menuBtn = $('menuBtn');
+  const btnDaily = $('btnDaily'), btnEndless = $('btnEndless'), toast = $('toast');
+
+  // ---- Tuning ----
+  const PX_PER_M = 8;        // 8px on screen = 1 meter
+  const LEVEL_M = 100;       // 100m per level
+  const BASE_SPEED = 400;    // level 1 speed (px/s)
+  const SPEED_STEP = 55;     // +px/s per level
+  const GRAVITY = 2400, JUMP_V = -780, AIR_JUMP_V = -720;
+
+  // ---- Seeded RNG (mulberry32) for the daily course ----
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const EPOCH = Date.UTC(2026, 0, 1);
+  function dayNumber() {
+    const n = new Date();
+    const today = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate());
+    return Math.floor((today - EPOCH) / 86400000) + 1;
+  }
+  function daySeed() {
+    const n = new Date();
+    return n.getUTCFullYear() * 10000 + (n.getUTCMonth() + 1) * 100 + n.getUTCDate();
+  }
+  const DAY_NUM = dayNumber();
+  startDay.textContent = '오늘의 챌린지 #' + DAY_NUM;
+  let rng = Math.random;
+
+  // ---- Responsive canvas ----
+  let W = 0, H = 0, DPR = 1, groundY = 0;
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    canvas.width = Math.floor(W * DPR); canvas.height = Math.floor(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    groundY = H * 0.78;
+  }
+  window.addEventListener('resize', resize);
+
+  // ---- State ----
+  const STATE = { MENU: 0, PLAY: 1, OVER: 2 };
+  let state = STATE.MENU, mode = 'daily', clock = 0;
+
+  function bestKey() { return mode === 'daily' ? 'olr_daily_' + DAY_NUM : 'olr_free_best'; }
+  function getBest() { return parseInt(localStorage.getItem(bestKey()) || '0', 10); }
+
+  const player = { x: 0, y: 0, r: 26, vy: 0, onGround: true, rot: 0, jumps: 0 };
+  const MAX_JUMPS = 2;
+  let coyote = 0;
+  let speed = BASE_SPEED, dist = 0, meters = 0, level = 1;
+  let obstacles = [], particles = [], stars = [];
+  let sinceSpawn = 0, spawnGapPx = 320, shake = 0;
+  let levelFlash = 0;       // seconds remaining for the LEVEL UP banner
+
+  function reset() {
+    rng = (mode === 'daily') ? mulberry32(daySeed()) : Math.random;
+    speed = BASE_SPEED; dist = 0; meters = 0; level = 1;
+    obstacles = []; particles = [];
+    sinceSpawn = 0; spawnGapPx = 340; shake = 0; levelFlash = 0;
+    player.x = W * 0.24; player.y = groundY - player.r;
+    player.vy = 0; player.onGround = true; player.rot = 0; player.jumps = 0;
+    stars = [];
+    for (let i = 0; i < 60; i++) {
+      stars.push({ x: Math.random() * W, y: Math.random() * groundY, z: 0.2 + Math.random() * 0.8, s: Math.random() * 1.6 + 0.4 });
+    }
+    hudMode.textContent = mode === 'daily' ? ('오늘의 챌린지 #' + DAY_NUM) : '자유 달리기';
+    hudBest.textContent = getBest() + 'm';
+    hudLevel.textContent = '1'; hudDist.textContent = '0m'; barFill.style.width = '0%';
+  }
+
+  function jump() {
+    if (player.onGround || coyote > 0) {
+      player.vy = JUMP_V; player.onGround = false; coyote = 0; player.jumps = 1;
+      spawnParticles(player.x, groundY, 8, '#4fd1c5');
+    } else if (player.jumps < MAX_JUMPS) {
+      // air jump — press again to go higher
+      player.vy = AIR_JUMP_V; player.jumps++;
+      spawnParticles(player.x, player.y + player.r, 12, '#a0f0e6');
+    }
+  }
+
+  // Obstacle kinds unlock with level. Gap is time-based so it stays fair as speed rises.
+  function spawnObstacle() {
+    const roll = rng();
+    let kind = 'short';
+    if (level >= 10 && roll > 0.60) kind = 'double';
+    else if (level >= 5 && roll > 0.72) kind = 'tall';
+
+    const diff = Math.min((level - 1) / 12, 1);
+    if (kind === 'double') {
+      const h = 30 + rng() * 26, w = 20 + rng() * 12;
+      obstacles.push({ x: W + 40, w, h, scored: false });
+      obstacles.push({ x: W + 40 + w + 26 + rng() * 20, w, h, scored: true });
+    } else if (kind === 'tall') {
+      const h = 74 + rng() * (26 + diff * 30), w = 20 + rng() * 18;
+      obstacles.push({ x: W + 40, w, h, scored: false });
+    } else {
+      const h = 26 + rng() * (30 + diff * 34), w = 20 + rng() * 24;
+      obstacles.push({ x: W + 40, w, h, scored: false });
+    }
+    // time gap between spawns shrinks with level but is clamped so a jump can always clear it
+    const gapTime = Math.max(0.52, 1.15 - level * 0.055) + rng() * 0.35;
+    spawnGapPx = speed * gapTime;
+  }
+
+  function spawnParticles(x, y, n, color) {
+    for (let i = 0; i < n; i++) {
+      particles.push({
+        x, y, vx: (Math.random() - 0.5) * 260, vy: -Math.random() * 320,
+        life: 0.5 + Math.random() * 0.4, max: 0.9, color, r: 2 + Math.random() * 3
+      });
+    }
+  }
+
+  function emojiFor(lv) {
+    const cells = 10, filled = Math.max(0, Math.min(cells, lv));
+    let out = '';
+    for (let i = 0; i < cells; i++) out += i < filled ? '🟩' : '⬛';
+    if (lv > 10) out += ' +' + (lv - 10); // beyond level 10 = the unlimited zone
+    return out;
+  }
+
+  function gameOver() {
+    state = STATE.OVER; shake = 16;
+    spawnParticles(player.x, player.y, 26, '#ff5a76');
+    const m = Math.floor(meters), lv = level;
+    const prevBest = getBest(), newBest = m > prevBest;
+    if (newBest) localStorage.setItem(bestKey(), String(m));
+    const shownBest = Math.max(m, prevBest);
+
+    overLabel.textContent = mode === 'daily' ? ('오늘의 챌린지 #' + DAY_NUM) : '자유 달리기';
+    finalDist.textContent = m + 'm';
+    finalLevel.textContent = '레벨 ' + lv + (lv > 10 ? ' ⚡ 무한' : '');
+    bestLine.textContent = (newBest ? '🎉 신기록 ' : '최고 ') + shownBest + 'm';
+    emojiBar.textContent = emojiFor(lv);
+    hudBest.textContent = shownBest + 'm';
+
+    setTimeout(() => {
+      if (state === STATE.OVER) { overScreen.classList.remove('hidden'); hud.classList.add('hidden'); }
+    }, 450);
+  }
+
+  // ---- Share ----
+  function buildShareText() {
+    const m = Math.floor(meters), lv = level;
+    const head = mode === 'daily' ? `다그닥다그닥 · 오늘의 챌린지 #${DAY_NUM}` : `다그닥다그닥 · 자유 달리기`;
+    return `${head}\n레벨 ${lv} · ${m}m 🐎\n${emojiFor(lv)}\n이길 수 있어? ${GAME_URL}`;
+  }
+
+  function makeShareCanvas() {
+    const c = document.createElement('canvas'); c.width = 1080; c.height = 1080;
+    const g = c.getContext('2d'), w = 1080, h = 1080, cx = w / 2;
+    const grad = g.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, '#181b3a'); grad.addColorStop(1, '#0a0a16');
+    g.fillStyle = grad; g.fillRect(0, 0, w, h);
+    g.strokeStyle = '#4fd1c5'; g.lineWidth = 8; g.shadowColor = '#4fd1c5'; g.shadowBlur = 40;
+    g.beginPath(); g.moveTo(90, 300); g.lineTo(w - 90, 300); g.stroke(); g.shadowBlur = 0;
+    // cute horse standing on the line
+    g.save(); g.translate(300, 300 - 26 * 2.4); g.scale(2.4, 2.4); drawHorse(g, 26, 0.6, true); g.restore();
+    g.textAlign = 'center';
+    g.fillStyle = '#fff'; g.font = '800 76px -apple-system, "Apple SD Gothic Neo", Segoe UI, Roboto, sans-serif';
+    g.fillText('다그닥다그닥', cx, 200);
+    g.fillStyle = '#4fd1c5'; g.font = '800 50px -apple-system, "Apple SD Gothic Neo", Segoe UI, Roboto, sans-serif';
+    g.fillText(`레벨 ${level}` + (level > 10 ? '  ⚡' : ''), cx, 440);
+    g.fillStyle = '#fff'; g.font = '800 260px -apple-system, Segoe UI, Roboto, sans-serif';
+    g.fillText(Math.floor(meters) + 'm', cx, 720);
+    g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '600 40px -apple-system, "Apple SD Gothic Neo", Segoe UI, Roboto, sans-serif';
+    g.fillText(mode === 'daily' ? `오늘의 챌린지 #${DAY_NUM}` : '자유 달리기', cx, 790);
+    const filled = Math.max(0, Math.min(10, level));
+    const bw = 70, gap = 12, total = 10 * bw + 9 * gap; let bx = cx - total / 2;
+    for (let i = 0; i < 10; i++) { g.fillStyle = i < filled ? '#4fd1c5' : 'rgba(255,255,255,.12)'; g.fillRect(bx, 860, bw, 70); bx += bw + gap; }
+    g.fillStyle = 'rgba(255,255,255,.5)'; g.font = '600 34px -apple-system, "Apple SD Gothic Neo", Segoe UI, Roboto, sans-serif';
+    g.fillText('미니마니모  ·  minimanimo.pages.dev', cx, 1010);
+    return c;
+  }
+
+  async function share() {
+    const text = buildShareText();
+    try {
+      const blob = await new Promise(res => makeShareCanvas().toBlob(res, 'image/png'));
+      if (blob) {
+        const file = new File([blob], 'one-line-runner.png', { type: 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], text, title: '다그닥다그닥' }); return;
+        }
+        if (navigator.share) { await navigator.share({ text, url: GAME_URL, title: '다그닥다그닥' }); return; }
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = 'one-line-runner.png'; a.click(); URL.revokeObjectURL(a.href);
+      }
+    } catch (e) {}
+    try { await navigator.clipboard.writeText(text); showToast('결과 복사됨!'); }
+    catch (e) { showToast('공유 준비 완료'); }
+  }
+
+  function showToast(msg) {
+    toast.textContent = msg || '복사됨!';
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1500);
+  }
+
+  // ---- Flow ----
+  function startGame(m) {
+    mode = m;
+    startScreen.classList.add('hidden'); overScreen.classList.add('hidden'); hud.classList.remove('hidden');
+    reset(); state = STATE.PLAY;
+  }
+  function toMenu() {
+    state = STATE.MENU;
+    overScreen.classList.add('hidden'); hud.classList.add('hidden'); startScreen.classList.remove('hidden');
+  }
+
+  btnDaily.addEventListener('click', e => { e.stopPropagation(); startGame('daily'); });
+  btnEndless.addEventListener('click', e => { e.stopPropagation(); startGame('free'); });
+  retryBtn.addEventListener('click', e => { e.stopPropagation(); startGame(mode); });
+  menuBtn.addEventListener('click', e => { e.stopPropagation(); toMenu(); });
+  shareBtn.addEventListener('click', e => { e.stopPropagation(); share(); });
+
+  function press(e) {
+    if (state === STATE.PLAY) { if (e && e.type === 'touchstart') e.preventDefault(); jump(); }
+  }
+  window.addEventListener('mousedown', press);
+  window.addEventListener('touchstart', press, { passive: false });
+  window.addEventListener('keydown', e => {
+    if (e.code === 'Space' || e.code === 'ArrowUp') {
+      e.preventDefault();
+      if (state === STATE.PLAY) jump();
+      else if (state === STATE.MENU) startGame('daily');
+      else if (state === STATE.OVER && !overScreen.classList.contains('hidden')) startGame(mode);
+    }
+  });
+
+  // ---- Loop ----
+  let last = performance.now();
+  function frame(now) {
+    let dt = (now - last) / 1000; last = now;
+    if (dt > 0.05) dt = 0.05;
+    clock += dt;
+    if (state === STATE.PLAY) update(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  function update(dt) {
+    dist += speed * dt;
+    meters = dist / PX_PER_M;
+
+    // level up every 100m -> step the speed
+    const newLevel = Math.floor(meters / LEVEL_M) + 1;
+    if (newLevel > level) {
+      level = newLevel;
+      levelFlash = 1.1;
+      shake = Math.max(shake, 8);
+      spawnParticles(player.x, groundY, 16, '#ffd166');
+    }
+    // target speed for current level, eased in
+    const target = BASE_SPEED + (level - 1) * SPEED_STEP;
+    speed += (target - speed) * Math.min(1, dt * 4);
+
+    hudLevel.textContent = String(level);
+    hudDist.textContent = Math.floor(meters) + 'm';
+    barFill.style.width = ((meters % LEVEL_M) / LEVEL_M * 100).toFixed(1) + '%';
+
+    // physics
+    player.vy += GRAVITY * dt; player.y += player.vy * dt;
+    if (player.onGround) coyote = Math.max(0, coyote - dt);
+    player.rot += (player.onGround ? 0 : dt * 8);
+    const floor = groundY - player.r;
+    if (player.y >= floor) {
+      player.y = floor;
+      if (!player.onGround) { player.onGround = true; coyote = 0.09; player.rot = 0; player.jumps = 0; }
+      player.vy = 0;
+    } else player.onGround = false;
+
+    sinceSpawn += speed * dt;
+    if (sinceSpawn >= spawnGapPx) { sinceSpawn = 0; spawnObstacle(); }
+
+    for (const o of obstacles) {
+      o.x -= speed * dt;
+      if (!o.scored && o.x + o.w < player.x - player.r) { o.scored = true; spawnParticles(player.x, player.y, 3, '#ffd166'); }
+      const px = player.x, py = player.y, pr = player.r * 0.58;
+      const nx = Math.max(o.x, Math.min(px, o.x + o.w));
+      const ny = Math.max(groundY - o.h, Math.min(py, groundY));
+      const dx = px - nx, dy = py - ny;
+      if (dx * dx + dy * dy < pr * pr) { gameOver(); }
+    }
+    obstacles = obstacles.filter(o => o.x + o.w > -20);
+
+    for (const p of particles) { p.vy += 900 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
+    particles = particles.filter(p => p.life > 0);
+
+    for (const st of stars) {
+      st.x -= speed * st.z * 0.25 * dt;
+      if (st.x < -2) { st.x = W + 2; st.y = Math.random() * groundY; }
+    }
+    if (shake > 0) shake = Math.max(0, shake - dt * 60);
+    if (levelFlash > 0) levelFlash = Math.max(0, levelFlash - dt);
+  }
+
+  function drawHills(baseY, amp, wl, color, scroll) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(-20, H + 20);
+    for (let x = -20; x <= W + 20; x += 10) {
+      const y = baseY - Math.abs(Math.sin((x + scroll) / wl)) * amp;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(W + 20, H + 20); ctx.closePath(); ctx.fill();
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+    let sx = 0, sy = 0;
+    if (shake > 0) { sx = (Math.random() - 0.5) * shake; sy = (Math.random() - 0.5) * shake; }
+    ctx.save(); ctx.translate(sx, sy);
+
+    // sky
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#1b1e46'); g.addColorStop(0.5, '#12132b'); g.addColorStop(1, '#0a0a16');
+    ctx.fillStyle = g; ctx.fillRect(-20, -20, W + 40, H + 40);
+
+    // soft moon glow top-right
+    const moon = ctx.createRadialGradient(W * 0.8, H * 0.16, 0, W * 0.8, H * 0.16, Math.min(W, H) * 0.4);
+    moon.addColorStop(0, 'rgba(120,130,220,.18)'); moon.addColorStop(1, 'rgba(120,130,220,0)');
+    ctx.fillStyle = moon; ctx.fillRect(0, 0, W, H);
+
+    // stars
+    for (const star of stars) { ctx.globalAlpha = 0.25 + star.z * 0.55; ctx.fillStyle = '#aab2ee'; ctx.fillRect(star.x, star.y, star.s, star.s); }
+    ctx.globalAlpha = 1;
+
+    // parallax hills behind the horizon
+    drawHills(groundY + 2, 48, 330, '#14162f', dist * 0.03);
+    drawHills(groundY + 2, 78, 190, '#1a1c40', dist * 0.075);
+
+    // ground fill below the line
+    const gg = ctx.createLinearGradient(0, groundY, 0, H);
+    gg.addColorStop(0, '#0c0d20'); gg.addColorStop(1, '#070710');
+    ctx.fillStyle = gg; ctx.fillRect(-20, groundY, W + 40, H - groundY + 20);
+
+    // neon ground line (turns gold on level up)
+    const lineCol = levelFlash > 0 ? '#ffd166' : '#4fd1c5';
+    ctx.strokeStyle = lineCol; ctx.lineWidth = 3; ctx.shadowColor = lineCol; ctx.shadowBlur = 16;
+    ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(W, groundY); ctx.stroke(); ctx.shadowBlur = 0;
+
+    // speed dashes on the ground to convey motion
+    const spacing = 64, off = ((state === STATE.PLAY ? dist : clock * 120) % spacing);
+    ctx.strokeStyle = 'rgba(79,209,197,.3)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let x = W - off; x > -spacing; x -= spacing) { ctx.moveTo(x, groundY + 11); ctx.lineTo(x - 15, groundY + 11); }
+    ctx.stroke();
+
+    // obstacles (gradient + top highlight + glow)
+    for (const o of obstacles) {
+      const oy = groundY - o.h;
+      const og = ctx.createLinearGradient(0, oy, 0, groundY);
+      og.addColorStop(0, '#ff8098'); og.addColorStop(1, '#e13a5c');
+      ctx.fillStyle = og; ctx.shadowColor = '#ff5a76'; ctx.shadowBlur = 14;
+      roundRect(o.x, oy, o.w, o.h, 5); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,255,255,.4)';
+      roundRect(o.x + 3, oy + 3, o.w - 6, Math.min(6, o.h * 0.3), 3); ctx.fill();
+    }
+
+    // pony shadow + pony (also idle on the menu)
+    {
+      const grounded = state === STATE.PLAY ? player.onGround : true;
+      const py = (state === STATE.MENU) ? (groundY - player.r) : player.y;
+      const px = player.x;
+      const jh = (groundY - player.r) - py;
+      const sc = Math.max(0.35, 1 - jh / (player.r * 14));
+      ctx.globalAlpha = 0.4 * sc;
+      ell(ctx, px, groundY + 4, player.r * 0.95 * sc, player.r * 0.26 * sc, '#05060c');
+      ctx.globalAlpha = 1;
+
+      ctx.save();
+      ctx.translate(px, py);
+      const stq = state === STATE.PLAY
+        ? Math.max(-0.16, Math.min(0.22, -player.vy * 0.0003))
+        : Math.sin(clock * 2.2) * 0.03;
+      ctx.translate(0, player.r); ctx.scale(1 - stq * 0.5, 1 + stq); ctx.translate(0, -player.r);
+      const phase = state === STATE.PLAY ? dist / 24 : clock * 3;
+      drawHorse(ctx, player.r, phase, grounded);
+      ctx.restore();
+    }
+
+    // particles
+    for (const p of particles) {
+      ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // LEVEL UP banner
+    if (levelFlash > 0 && state === STATE.PLAY) {
+      const a = Math.min(1, levelFlash * 2);
+      ctx.globalAlpha = a;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffd166'; ctx.shadowColor = '#ffd166'; ctx.shadowBlur = 20;
+      ctx.font = '800 ' + Math.round(Math.min(W, 520) * 0.11) + 'px -apple-system, Segoe UI, Roboto, sans-serif';
+      ctx.fillText('LEVEL ' + level + '  ⚡', W / 2, H * 0.34);
+      ctx.shadowBlur = 0; ctx.fillStyle = 'rgba(255,255,255,.8)';
+      ctx.font = '700 ' + Math.round(Math.min(W, 520) * 0.045) + 'px -apple-system, Segoe UI, Roboto, sans-serif';
+      ctx.fillText('SPEED UP', W / 2, H * 0.34 + Math.min(W, 520) * 0.09);
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+
+    // vignette (screen space)
+    const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.34, W / 2, H / 2, Math.max(W, H) * 0.72);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.42)');
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // ---- Cute front-facing pony (matched to reference image) ----
+  function ell(c, x, y, rx, ry, color) {
+    c.save(); c.translate(x, y); c.scale(rx, ry);
+    c.beginPath(); c.arc(0, 0, 1, 0, Math.PI * 2);
+    c.fillStyle = color; c.fill(); c.restore();
+  }
+  function ellPath(c, x, y, rx, ry) {
+    c.save(); c.translate(x, y); c.scale(rx, ry);
+    c.beginPath(); c.arc(0, 0, 1, 0, Math.PI * 2); c.restore();
+  }
+  function rrPath(c, x, y, w, h, r) {
+    c.beginPath(); c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+  }
+  // origin = center; feet touch at y=+R; faces the camera
+  function drawHorse(c, R, phase, grounded) {
+    const BODY = '#d8a074', MUZ = '#f6e7d5', FORE = '#5b4331', TAIL2 = '#8a6b50',
+          EARIN = '#f3c3c6', EYE = '#2c2422', CHEEK = 'rgba(233,150,150,.75)',
+          HOOF = '#4a3626', LEG = '#f6e7d5';
+    const k = R;
+    const bob = grounded ? Math.abs(Math.sin(phase)) * 0.05 * k : 0;
+    c.save(); c.translate(0, -bob);
+
+    // tail (behind body, to the right)
+    c.save(); c.translate(0.46 * k, 0.42 * k);
+    c.fillStyle = FORE;
+    c.beginPath();
+    c.moveTo(0, -0.05 * k);
+    c.quadraticCurveTo(0.5 * k, 0.02 * k, 0.42 * k, 0.5 * k);
+    c.quadraticCurveTo(0.36 * k, 0.74 * k, 0.12 * k, 0.62 * k);
+    c.quadraticCurveTo(0.3 * k, 0.5 * k, 0.14 * k, 0.18 * k);
+    c.closePath(); c.fill();
+    c.strokeStyle = TAIL2; c.lineWidth = 0.06 * k; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(0.3 * k, 0.12 * k); c.quadraticCurveTo(0.42 * k, 0.38 * k, 0.24 * k, 0.56 * k); c.stroke();
+    c.restore();
+
+    // legs (cream) with hooves
+    for (const lx of [-0.24 * k, 0.24 * k]) {
+      const off = grounded ? Math.sin(phase + (lx < 0 ? 0 : Math.PI)) * 0.04 * k : 0;
+      c.fillStyle = LEG; rrPath(c, lx - 0.13 * k, 0.5 * k, 0.26 * k, 0.46 * k + off, 0.1 * k); c.fill();
+      c.fillStyle = HOOF; rrPath(c, lx - 0.13 * k, 0.8 * k + off, 0.26 * k, 0.17 * k, 0.07 * k); c.fill();
+    }
+
+    // body
+    ell(c, 0, 0.5 * k, 0.46 * k, 0.4 * k, BODY);
+
+    // head
+    ell(c, 0, -0.28 * k, 0.86 * k, 0.82 * k, BODY);
+
+    // ears
+    for (const s of [-1, 1]) {
+      c.save(); c.translate(s * 0.62 * k, -0.92 * k); c.rotate(s * 0.32);
+      c.fillStyle = BODY; ellPath(c, 0, 0, 0.22 * k, 0.42 * k); c.fill();
+      c.fillStyle = EARIN; ellPath(c, 0, 0.04 * k, 0.11 * k, 0.26 * k); c.fill();
+      c.restore();
+    }
+
+    // forelock (dark mane tuft between ears, hanging onto forehead)
+    c.fillStyle = FORE;
+    c.beginPath();
+    c.moveTo(-0.3 * k, -0.92 * k);
+    c.quadraticCurveTo(0, -1.18 * k, 0.3 * k, -0.92 * k);
+    c.quadraticCurveTo(0.36 * k, -0.5 * k, 0.19 * k, -0.55 * k);
+    c.quadraticCurveTo(0.11 * k, -0.32 * k, 0, -0.52 * k);
+    c.quadraticCurveTo(-0.11 * k, -0.32 * k, -0.19 * k, -0.55 * k);
+    c.quadraticCurveTo(-0.36 * k, -0.5 * k, -0.3 * k, -0.92 * k);
+    c.closePath(); c.fill();
+
+    // muzzle
+    ell(c, 0, 0.04 * k, 0.5 * k, 0.4 * k, MUZ);
+
+    // cheeks
+    ell(c, -0.42 * k, -0.04 * k, 0.1 * k, 0.07 * k, CHEEK);
+    ell(c,  0.42 * k, -0.04 * k, 0.1 * k, 0.07 * k, CHEEK);
+
+    // eyes + highlights
+    ell(c, -0.34 * k, -0.3 * k, 0.1 * k, 0.13 * k, EYE);
+    ell(c,  0.34 * k, -0.3 * k, 0.1 * k, 0.13 * k, EYE);
+    ell(c, -0.31 * k, -0.35 * k, 0.03 * k, 0.04 * k, '#fff');
+    ell(c,  0.37 * k, -0.35 * k, 0.03 * k, 0.04 * k, '#fff');
+
+    // smile
+    c.strokeStyle = EYE; c.lineWidth = 0.035 * k; c.lineCap = 'round';
+    c.beginPath(); c.arc(0, -0.04 * k, 0.12 * k, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
+
+    c.restore();
+  }
+
+  resize(); reset(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

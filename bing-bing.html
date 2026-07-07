@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <meta name="theme-color" content="#0f1020" />
-<title>Perfect Circle</title>
-<meta property="og:title" content="Perfect Circle" />
-<meta property="og:description" content="Tap when the needle hits the green zone. It gets faster, tighter, and flips direction. How high can your combo go?" />
+<title>빙빙 · 미니마니모</title>
+<meta property="og:title" content="빙빙 · 미니마니모" />
+<meta property="og:description" content="빙빙 도는 바늘이 초록 구간에 올 때 탭! 점점 빨라지고 좁아지고 방향도 뒤집힌다. 콤보 몇까지 갈 수 있을까?" />
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -62,31 +62,32 @@
 <div id="wrap"><canvas id="game"></canvas></div>
 
 <div id="hud" class="hidden">
-  <span class="lbl">COMBO</span>
+  <span class="lbl">콤보</span>
   <div class="big" id="hudScore">0</div>
-  <div class="best" id="hudBest">BEST 0</div>
+  <div class="best" id="hudBest">최고 0</div>
 </div>
 
 <!-- Start screen -->
 <div id="startScreen" class="overlay">
-  <div class="title">Perfect <span class="accent">Circle</span></div>
-  <div class="sub">Tap when the needle hits the <b style="color:#4fd1c5">green zone</b>.<br>It gets faster, tighter, and flips direction.</div>
+  <div class="title">빙<span class="accent">빙</span></div>
+  <div class="sub">바늘이 <b style="color:#4fd1c5">초록 구간</b>에 올 때 탭!<br>점점 빨라지고 좁아지고 방향도 뒤집혀.</div>
   <div class="best" id="startBest"></div>
   <div class="btnrow">
-    <button class="btn primary" id="playBtn">Play</button>
+    <button class="btn primary" id="playBtn">시작</button>
   </div>
+  <a href="/" style="pointer-events:auto; margin-top:18px; color:#fff; opacity:.4; font-size:13px; text-decoration:none">‹ 미니마니모</a>
 </div>
 
 <!-- Game over screen -->
 <div id="overScreen" class="overlay hidden">
-  <div class="sub" style="opacity:.6;margin:0">COMBO</div>
+  <div class="sub" style="opacity:.6;margin:0">콤보</div>
   <div class="big-score" id="finalScore">0</div>
-  <div class="lvltag" id="finalNote">Nice!</div>
+  <div class="lvltag" id="finalNote">굿!</div>
   <div class="best" id="overBest"></div>
   <div class="emojibar" id="emojibar"></div>
   <div class="btnrow">
-    <button class="btn primary" id="retryBtn">Retry</button>
-    <button class="btn ghost" id="shareBtn">Share</button>
+    <button class="btn primary" id="retryBtn">다시하기</button>
+    <button class="btn ghost" id="shareBtn">공유</button>
   </div>
 </div>
 
@@ -196,7 +197,7 @@
     difficulty();
     placeTarget();
     hudScore.textContent = "0";
-    hudBest.textContent = "BEST " + best;
+    hudBest.textContent = "최고 " + best;
     startScreen.classList.add("hidden");
     overScreen.classList.add("hidden");
     hud.classList.remove("hidden");
@@ -239,19 +240,19 @@
   function showOver(isBest) {
     finalScore.textContent = String(score);
     finalNote.textContent = noteFor(score);
-    overBest.textContent = isBest ? "🎉 New best!" : ("BEST " + best);
+    overBest.textContent = isBest ? "🎉 신기록!" : ("최고 " + best);
     emojibar.textContent = emojiFor(score);
     hud.classList.add("hidden");
     overScreen.classList.remove("hidden");
   }
 
   function noteFor(s) {
-    if (s === 0) return "So close!";
-    if (s < 5) return "Warming up";
-    if (s < 12) return "Sharp!";
-    if (s < 22) return "On fire 🔥";
-    if (s < 35) return "Insane!";
-    return "Legendary 👑";
+    if (s === 0) return "아깝다!";
+    if (s < 5) return "몸풀기";
+    if (s < 12) return "날카로운데?";
+    if (s < 22) return "불붙었다 🔥";
+    if (s < 35) return "미쳤다!";
+    return "레전드 👑";
   }
   function emojiFor(s) {
     var n = Math.min(10, Math.max(1, Math.round(s / 4)));
@@ -301,16 +302,16 @@
   document.getElementById("shareBtn").addEventListener("click", share);
 
   function share() {
-    var txt = "🎯 Perfect Circle — combo " + score + "!\nTap when the needle hits the green. Beat me:";
+    var txt = "🎯 빙빙 — 콤보 " + score + "!\n초록 구간에 올 때 탭! 나 이길 수 있어?";
     var url = location.href.split("#")[0];
     if (navigator.share) {
-      navigator.share({ title: "Perfect Circle", text: txt, url: url }).catch(function () {});
+      navigator.share({ title: "빙빙 · 미니마니모", text: txt, url: url }).catch(function () {});
     } else {
       var full = txt + " " + url;
       if (navigator.clipboard) {
-        navigator.clipboard.writeText(full).then(function () { showToast("Copied to clipboard!"); },
-          function () { showToast("Couldn't copy"); });
-      } else showToast("Sharing not supported");
+        navigator.clipboard.writeText(full).then(function () { showToast("복사됨!"); },
+          function () { showToast("복사 실패"); });
+      } else showToast("공유를 지원하지 않아요");
     }
   }
   var toastT = null;
@@ -444,7 +445,7 @@
       ctx.fillStyle = ACCENT;
       ctx.font = "800 " + Math.round(radius * 0.16) + "px -apple-system, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("REVERSE!", cx, cy + radius + 40);
+      ctx.fillText("반대로!", cx, cy + radius + 40);
       ctx.globalAlpha = 1;
     }
 
@@ -452,7 +453,7 @@
   }
 
   // init labels
-  startBest.textContent = best > 0 ? ("BEST " + best) : "";
+  startBest.textContent = best > 0 ? ("최고 " + best) : "";
   requestAnimationFrame(frame);
 })();
 </script>
