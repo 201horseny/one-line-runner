@@ -121,8 +121,8 @@
   // ---- Tuning ----
   const PX_PER_M = 8;        // 8px on screen = 1 meter
   const LEVEL_M = 100;       // 100m per level
-  const BASE_SPEED = 200;    // level 1 speed (px/s)
-  const SPEED_STEP = 42;     // +px/s per level
+  const BASE_SPEED = 400;    // level 1 speed (px/s)
+  const SPEED_STEP = 55;     // +px/s per level
   const GRAVITY = 2400, JUMP_V = -780, AIR_JUMP_V = -720;
 
   // ---- Seeded RNG (mulberry32) for the daily course ----
@@ -278,6 +278,10 @@
     g.fillStyle = grad; g.fillRect(0, 0, w, h);
     g.strokeStyle = '#4fd1c5'; g.lineWidth = 8; g.shadowColor = '#4fd1c5'; g.shadowBlur = 40;
     g.beginPath(); g.moveTo(90, 300); g.lineTo(w - 90, 300); g.stroke(); g.shadowBlur = 0;
+    // little horse standing on the line
+    g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+    g.font = '120px "Apple Color Emoji", "Segoe UI Emoji", serif';
+    g.fillText('🐎', 300, 296);
     g.textAlign = 'center';
     g.fillStyle = '#fff'; g.font = '800 76px -apple-system, Segoe UI, Roboto, sans-serif';
     g.fillText('ONE-LINE RUNNER', cx, 200);
@@ -439,10 +443,16 @@
     ctx.shadowBlur = 0;
 
     if (state !== STATE.MENU) {
-      ctx.save(); ctx.translate(player.x, player.y); ctx.rotate(player.rot);
-      ctx.fillStyle = '#fff'; ctx.shadowColor = '#fff'; ctx.shadowBlur = 16;
-      const s = player.r; roundRect(-s, -s, s * 2, s * 2, 5); ctx.fill();
-      ctx.restore(); ctx.shadowBlur = 0;
+      ctx.save();
+      ctx.translate(player.x, player.y);
+      // tilt with vertical velocity: nose up when rising, down when falling
+      const tilt = Math.max(-0.45, Math.min(0.45, player.vy * 0.0005));
+      ctx.rotate(tilt);
+      ctx.scale(-1, 1); // 🐎 faces left by default → flip to run rightward
+      ctx.font = (player.r * 2.7) + 'px "Apple Color Emoji", "Segoe UI Emoji", serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🐎', 0, 0);
+      ctx.restore();
     }
 
     for (const p of particles) {
