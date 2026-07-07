@@ -123,7 +123,7 @@
   const LEVEL_M = 100;       // 100m per level
   const BASE_SPEED = 200;    // level 1 speed (px/s)
   const SPEED_STEP = 42;     // +px/s per level
-  const GRAVITY = 2400, JUMP_V = -780;
+  const GRAVITY = 2400, JUMP_V = -780, AIR_JUMP_V = -720;
 
   // ---- Seeded RNG (mulberry32) for the daily course ----
   function mulberry32(a) {
@@ -167,7 +167,8 @@
   function bestKey() { return mode === 'daily' ? 'olr_daily_' + DAY_NUM : 'olr_free_best'; }
   function getBest() { return parseInt(localStorage.getItem(bestKey()) || '0', 10); }
 
-  const player = { x: 0, y: 0, r: 16, vy: 0, onGround: true, rot: 0 };
+  const player = { x: 0, y: 0, r: 16, vy: 0, onGround: true, rot: 0, jumps: 0 };
+  const MAX_JUMPS = 2;
   let coyote = 0;
   let speed = BASE_SPEED, dist = 0, meters = 0, level = 1;
   let obstacles = [], particles = [], stars = [];
@@ -180,7 +181,7 @@
     obstacles = []; particles = [];
     sinceSpawn = 0; spawnGapPx = 340; shake = 0; levelFlash = 0;
     player.x = W * 0.24; player.y = groundY - player.r;
-    player.vy = 0; player.onGround = true; player.rot = 0;
+    player.vy = 0; player.onGround = true; player.rot = 0; player.jumps = 0;
     stars = [];
     for (let i = 0; i < 60; i++) {
       stars.push({ x: Math.random() * W, y: Math.random() * groundY, z: 0.2 + Math.random() * 0.8, s: Math.random() * 1.6 + 0.4 });
@@ -192,8 +193,12 @@
 
   function jump() {
     if (player.onGround || coyote > 0) {
-      player.vy = JUMP_V; player.onGround = false; coyote = 0;
+      player.vy = JUMP_V; player.onGround = false; coyote = 0; player.jumps = 1;
       spawnParticles(player.x, groundY, 8, '#4fd1c5');
+    } else if (player.jumps < MAX_JUMPS) {
+      // air jump — press again to go higher
+      player.vy = AIR_JUMP_V; player.jumps++;
+      spawnParticles(player.x, player.y + player.r, 12, '#a0f0e6');
     }
   }
 
@@ -382,7 +387,7 @@
     const floor = groundY - player.r;
     if (player.y >= floor) {
       player.y = floor;
-      if (!player.onGround) { player.onGround = true; coyote = 0.09; player.rot = 0; }
+      if (!player.onGround) { player.onGround = true; coyote = 0.09; player.rot = 0; player.jumps = 0; }
       player.vy = 0;
     } else player.onGround = false;
 
