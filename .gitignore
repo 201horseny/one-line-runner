@@ -3,3 +3,5 @@
 .gh_token
 .cf_token
 dist/
+crazygames/*/
+crazygames/*.zip
